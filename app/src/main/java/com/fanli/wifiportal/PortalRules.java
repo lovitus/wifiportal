@@ -78,28 +78,116 @@ final class PortalRules {
         return settings;
     }
 
-    static List<Diff> diff(List<PortalSetting> desired, Map<String, String> current, int sdk) {
+    static List<PortalSetting> catalog(int sdk) {
+        List<PortalSetting> settings = new ArrayList<>();
+        addGlobal(settings, CAPTIVE_PORTAL_SERVER, "", 21);
+        addGlobal(settings, CAPTIVE_PORTAL_DETECTION_ENABLED, "", 21);
+        addGlobal(settings, CAPTIVE_PORTAL_MODE, "", 23);
+        addGlobal(settings, CAPTIVE_PORTAL_HTTP_URL, "", 24);
+        addGlobal(settings, CAPTIVE_PORTAL_HTTPS_URL, "", 24);
+        addGlobal(settings, CAPTIVE_PORTAL_FALLBACK_URL, "", 24);
+        addMirrored(settings, CAPTIVE_PORTAL_OTHER_FALLBACK_URLS, "", sdk);
+        addMirrored(settings, CAPTIVE_PORTAL_OTHER_HTTP_URLS, "", sdk);
+        addMirrored(settings, CAPTIVE_PORTAL_OTHER_HTTPS_URLS, "", sdk);
+        addMirrored(settings, CAPTIVE_PORTAL_USER_AGENT, "", sdk);
+        addMirrored(settings, CAPTIVE_PORTAL_USE_HTTPS, "", sdk);
+        addMirrored(settings, CAPTIVE_PORTAL_FALLBACK_PROBE_SPECS, "", sdk);
+        addGlobal(settings, NETWORK_AVOID_BAD_WIFI, "", 21);
+        addGlobal(settings, WIFI_WATCHDOG_ON, "", 21);
+        addGlobal(settings, WIFI_WATCHDOG_POOR_NETWORK_TEST_ENABLED, "", 21);
+        addGlobal(settings, WIFI_WATCHDOG_BACKGROUND_CHECK_ENABLED, "", 21);
+        return supported(settings, sdk);
+    }
+
+    static List<Diff> diff(List<PortalSetting> desired, Map<String, PortalValue> current, int sdk) {
         List<Diff> diffs = new ArrayList<>();
         for (PortalSetting setting : desired) {
             if (sdk < setting.minSdk) {
                 continue;
             }
-            String actual = current.get(setting.id());
+            PortalValue actual = current.get(setting.id());
             if (actual == null) {
-                diffs.add(new Diff(setting, "(读取失败)", setting.value));
-            } else if (!setting.value.equals(actual)) {
-                diffs.add(new Diff(setting, actual, setting.value));
+                diffs.add(new Diff(setting, PortalValue.missing("读取失败"), PortalValue.of(setting.value, "desired")));
+            } else if (!actual.sameDesired(setting.value)) {
+                diffs.add(new Diff(setting, actual, PortalValue.of(setting.value, "desired")));
             }
         }
         return diffs;
     }
 
-    static Map<String, String> emptyCurrent(List<PortalSetting> desired) {
-        Map<String, String> map = new LinkedHashMap<>();
+    static Map<String, PortalValue> emptyCurrent(List<PortalSetting> desired) {
+        Map<String, PortalValue> map = new LinkedHashMap<>();
         for (PortalSetting setting : desired) {
-            map.put(setting.id(), "");
+            map.put(setting.id(), PortalValue.missing("empty"));
         }
         return map;
+    }
+
+    static List<PortalWritePlan.Item> desiredPlanItems(
+            List<PortalSetting> desired,
+            Map<String, PortalValue> current,
+            android.content.SharedPreferences prefs,
+            int sdk,
+            PortalSetting onlySetting) {
+        return desiredPlanItems(desired, current, prefs, sdk, onlySetting, "程序配置: SharedPreferences + 页面保存项");
+    }
+
+    static List<PortalWritePlan.Item> desiredPlanItems(
+            List<PortalSetting> desired,
+            Map<String, PortalValue> current,
+            android.content.SharedPreferences prefs,
+            int sdk,
+            PortalSetting onlySetting,
+            String source) {
+        List<PortalWritePlan.Item> items = new ArrayList<>();
+        for (PortalSetting setting : desired) {
+            if (sdk < setting.minSdk || (onlySetting != null && !setting.id().equals(onlySetting.id()))) {
+                continue;
+            }
+            PortalValue currentValue = current.get(setting.id());
+            PortalValue target = PortalValue.of(setting.value, "saved-config");
+            if (currentValue != null && currentValue.same(target)) {
+                continue;
+            }
+            items.add(new PortalWritePlan.Item(
+                    setting,
+                    PortalSnapshots.original(prefs, setting),
+                    currentValue,
+                    target,
+                    setting.writeCommand(target),
+                    source));
+        }
+        return items;
+    }
+
+    static List<PortalWritePlan.Item> restorePlanItems(
+            List<PortalSetting> catalog,
+            Map<String, PortalValue> current,
+            android.content.SharedPreferences prefs,
+            int sdk,
+            PortalSetting onlySetting) {
+        List<PortalWritePlan.Item> items = new ArrayList<>();
+        for (PortalSetting setting : catalog) {
+            if (sdk < setting.minSdk || (onlySetting != null && !setting.id().equals(onlySetting.id()))) {
+                continue;
+            }
+            PortalValue original = PortalSnapshots.original(prefs, setting);
+            if (original == null) {
+                continue;
+            }
+            PortalValue currentValue = current.get(setting.id());
+            if (currentValue != null && currentValue.same(original)) {
+                continue;
+            }
+            items.add(new PortalWritePlan.Item(
+                    setting,
+                    original,
+                    currentValue,
+                    original,
+                    setting.writeCommand(original),
+                    "原始备份: SharedPreferences"));
+        }
+        return items;
     }
 
     private static void addGlobal(List<PortalSetting> settings, String key, String value, int minSdk) {
@@ -113,12 +201,22 @@ final class PortalRules {
         }
     }
 
+    private static List<PortalSetting> supported(List<PortalSetting> settings, int sdk) {
+        List<PortalSetting> supported = new ArrayList<>();
+        for (PortalSetting setting : settings) {
+            if (sdk >= setting.minSdk) {
+                supported.add(setting);
+            }
+        }
+        return supported;
+    }
+
     static final class Diff {
         final PortalSetting setting;
-        final String actual;
-        final String expected;
+        final PortalValue actual;
+        final PortalValue expected;
 
-        Diff(PortalSetting setting, String actual, String expected) {
+        Diff(PortalSetting setting, PortalValue actual, PortalValue expected) {
             this.setting = setting;
             this.actual = actual;
             this.expected = expected;

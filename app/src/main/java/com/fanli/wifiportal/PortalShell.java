@@ -13,15 +13,18 @@ final class PortalShell {
         this.shell = shell;
     }
 
-    Map<String, String> readAll(List<PortalSetting> settings, int sdk) throws RemoteException {
-        Map<String, String> values = new LinkedHashMap<>();
+    Map<String, PortalValue> readAll(List<PortalSetting> settings, int sdk) throws RemoteException {
+        Map<String, PortalValue> values = new LinkedHashMap<>();
         for (PortalSetting setting : settings) {
             if (sdk < setting.minSdk) {
                 continue;
             }
-            ShellText.ShellResult result = ShellText.parseResult(shell.exec(setting.readCommand()));
+            String command = setting.readCommand();
+            ShellText.ShellResult result = ShellText.parseResult(shell.exec(command));
             if (result.ok()) {
-                values.put(setting.id(), normalizeGetOutput(result.output));
+                values.put(setting.id(), PortalValue.fromSettingsOutput(result.output, "Shizuku UserService: " + command));
+            } else {
+                values.put(setting.id(), PortalValue.missing("读取失败: " + command + " exit=" + result.exitCode));
             }
         }
         return values;
@@ -42,16 +45,21 @@ final class PortalShell {
         return result.output.length() == 0 ? "已应用配置" : result.output;
     }
 
+    String runCommands(List<String> commands) throws RemoteException {
+        StringBuilder script = new StringBuilder();
+        for (String command : commands) {
+            script.append(command).append('\n');
+        }
+        ShellText.ShellResult result = ShellText.parseResult(shell.exec(script.toString()));
+        if (!result.ok()) {
+            return "执行失败，exit=" + result.exitCode + "\n" + result.output;
+        }
+        return result.output.length() == 0 ? "命令已执行" : result.output;
+    }
+
     String sdk() throws RemoteException {
         ShellText.ShellResult result = ShellText.parseResult(shell.exec("getprop ro.build.version.sdk"));
         return result.output;
     }
 
-    private static String normalizeGetOutput(String output) {
-        String value = output == null ? "" : output.trim();
-        if ("null".equals(value)) {
-            return "";
-        }
-        return value;
-    }
 }

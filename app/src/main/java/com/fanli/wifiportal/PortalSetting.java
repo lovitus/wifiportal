@@ -37,9 +37,23 @@ final class PortalSetting {
     }
 
     String writeCommand() {
-        if (store == Store.GLOBAL) {
-            return "settings put global " + ShellText.quote(key) + " " + ShellText.quote(value);
+        return writeCommand(PortalValue.of(value, "desired"));
+    }
+
+    String writeCommand(PortalValue target) {
+        if (target == null || !target.exists) {
+            return deleteCommand();
         }
-        return "cmd device_config put connectivity " + ShellText.quote(key) + " " + ShellText.quote(value);
+        if (store == Store.GLOBAL) {
+            return "settings put global " + ShellText.quote(key) + " " + ShellText.quote(target.value);
+        }
+        return "cmd device_config put connectivity " + ShellText.quote(key) + " " + ShellText.quote(target.value);
+    }
+
+    String deleteCommand() {
+        if (store == Store.GLOBAL) {
+            return "settings delete global " + ShellText.quote(key);
+        }
+        return "cmd device_config delete connectivity " + ShellText.quote(key);
     }
 }

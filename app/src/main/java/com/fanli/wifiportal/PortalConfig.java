@@ -9,6 +9,10 @@ final class PortalConfig {
     static final String DEFAULT_HTTP_URL = "http://connectivitycheck.gstatic.com/generate_204";
     static final String DEFAULT_HTTPS_URL = "https://www.google.com/generate_204";
     static final String DEFAULT_FALLBACK_URL = "http://www.google.com/gen_204";
+    static final String CHINA_HTTP_URL = "http://connect.rom.miui.com/generate_204";
+    static final String CHINA_HTTPS_URL = "https://connect.rom.miui.com/generate_204";
+    static final String CHINA_FALLBACK_URL = "http://connectivitycheck.platform.hicloud.com/generate_204";
+    static final String CHINA_FALLBACK_HTTPS_URL = "https://connectivitycheck.platform.hicloud.com/generate_204";
 
     boolean disableDetection;
     boolean includeLegacyServer;
@@ -53,6 +57,30 @@ final class PortalConfig {
         config.otherHttpsUrls = DEFAULT_HTTPS_URL;
         config.userAgent = "";
         config.fallbackProbeSpecs = "";
+        config.useHttps = true;
+        config.portalMode = 1;
+        return config;
+    }
+
+    static PortalConfig mainlandChina() {
+        PortalConfig config = defaults();
+        config.disableDetection = false;
+        config.includeLegacyServer = true;
+        config.includeHttpUrl = true;
+        config.includeHttpsUrl = true;
+        config.includeFallbackUrl = true;
+        config.includeOtherFallbackUrls = true;
+        config.includeModernUrlLists = true;
+        config.includeUseHttps = true;
+        config.includeUserAgent = false;
+        config.includeFallbackProbeSpecs = false;
+        config.includeLegacyWifiWatchdog = false;
+        config.httpUrl = CHINA_HTTP_URL;
+        config.httpsUrl = CHINA_HTTPS_URL;
+        config.fallbackUrl = CHINA_FALLBACK_URL;
+        config.otherFallbackUrls = CHINA_HTTP_URL + "," + CHINA_FALLBACK_URL;
+        config.otherHttpUrls = CHINA_HTTP_URL + "," + CHINA_FALLBACK_URL;
+        config.otherHttpsUrls = CHINA_HTTPS_URL + "," + CHINA_FALLBACK_HTTPS_URL;
         config.useHttps = true;
         config.portalMode = 1;
         return config;

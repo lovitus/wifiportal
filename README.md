@@ -9,6 +9,9 @@ Small native Android app for applying captive portal probe settings through Shiz
 - Uses Shizuku UserService, not the deprecated `Shizuku.newProcess`.
 - Persists desired settings locally and checks them again whenever the app opens with Shizuku active.
 - Requests Shizuku authorization again when permission is missing.
+- Backs up original runtime values before writes and lets users restore all keys or a single key.
+- Shows the saved value, runtime value, original backup, target value, and exact shell command before any write.
+- Includes a China mainland preset using MIUI and Huawei 204 endpoints; it only saves the preset after the write is verified.
 
 Shizuku/Sui currently require Android 6.0+. The APK keeps minSdk 21 so Android 5 devices can install and retain the same settings model, but in-app privileged apply/check depends on Shizuku/Sui being available.
 
@@ -29,6 +32,10 @@ For Android 10+ mirrored NetworkStack keys are also written to `device_config co
 ```sh
 ./gradlew testDebugUnitTest assembleDebug
 ```
+
+## Safety model
+
+Writes are never executed directly from a mismatch prompt. The app reads runtime values through Shizuku, records the data source and read commands in the audit log, builds a write plan, shows the exact commands to the user, and executes only after confirmation. After execution it reads the same keys again and updates the displayed snapshot.
 
 Release signing is configured through Gradle properties:
 
