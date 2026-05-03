@@ -83,8 +83,10 @@ public final class MainActivity extends Activity {
             () -> mainHandler.post(() -> {
                 setShizukuStatus(COLOR_WAIT, "Shizuku 已激活，正在确认授权");
                 if (!shizukuClient.hasPermission()) {
-                    shizukuClient.requestPermission();
-                    setShizukuStatus(COLOR_WAIT, "Shizuku 已激活，但缺少授权，已请求授权弹窗");
+                    boolean requested = shizukuClient.requestPermission();
+                    setShizukuStatus(COLOR_WAIT, requested
+                            ? "Shizuku 已激活，但缺少授权，已请求授权"
+                            : "Shizuku 已激活，但缺少授权，请在 Shizuku 中手动授权");
                 } else {
                     setShizukuStatus(COLOR_OK, "Shizuku 已授权，可读取和写入系统配置");
                     readRuntimeAndRefresh(true);
@@ -133,6 +135,7 @@ public final class MainActivity extends Activity {
         Shizuku.removeBinderReceivedListener(binderReceivedListener);
         Shizuku.removeBinderDeadListener(binderDeadListener);
         Shizuku.removeRequestPermissionResultListener(permissionResultListener);
+        shizukuClient.destroy();
         executor.shutdownNow();
     }
 
@@ -259,8 +262,10 @@ public final class MainActivity extends Activity {
         String identity = uid == 0 ? "root" : uid == 2000 ? "shell/adb" : "uid=" + uid;
         if (!shizukuClient.hasPermission()) {
             setShizukuStatus(COLOR_WAIT, "Shizuku 已运行但未授权，身份 " + identity);
-            shizukuClient.requestPermission();
-            appendAudit("Shizuku 状态: 已运行但未授权，已请求授权弹窗");
+            boolean requested = shizukuClient.requestPermission();
+            appendAudit(requested
+                    ? "Shizuku 状态: 已运行但未授权，已请求授权"
+                    : "Shizuku 状态: 已运行但未授权，请在 Shizuku 中手动授权");
             return;
         }
         setShizukuStatus(COLOR_OK, "Shizuku 已授权，身份 " + identity + "，版本 " + shizukuClient.serverVersionName());
@@ -613,9 +618,9 @@ public final class MainActivity extends Activity {
                 "取消",
                 "确认备份",
                 () -> {
-                    PortalSnapshots.overwriteOriginals(prefs, current);
+                    int saved = PortalSnapshots.overwriteOriginals(prefs, current);
                     PortalSnapshots.saveCurrent(prefs, current);
-                    appendAudit("默认备份: 用户确认后覆盖保存 " + current.size() + " 项原始值");
+                    appendAudit("默认备份: 用户确认后覆盖保存 " + saved + " 项原始值，跳过读取失败项");
                     updateStatus("默认备份已保存");
                     refreshCoverageFromSnapshots();
                 });
@@ -772,7 +777,7 @@ public final class MainActivity extends Activity {
     }
 
     private void updateStatus(String message) {
-        statusView.setText("Android API " + Build.VERSION.SDK_INT + " · " + message);
+        statusView.setText(getString(R.string.status_format, Build.VERSION.SDK_INT, message));
     }
 
     private void appendAudit(String message) {

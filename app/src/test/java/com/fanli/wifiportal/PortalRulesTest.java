@@ -2,8 +2,8 @@ package com.fanli.wifiportal;
 
 import org.junit.Test;
 
-import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -91,6 +91,46 @@ public final class PortalRulesTest {
         assertEquals(0, plan.mismatches(current).size());
     }
 
+    @Test
+    public void originalBackupSkipsReadFailures() {
+        InMemorySharedPreferences prefs = new InMemorySharedPreferences();
+        PortalSetting setting = new PortalSetting(
+                PortalSetting.Store.GLOBAL,
+                PortalRules.CAPTIVE_PORTAL_HTTP_URL,
+                "",
+                21);
+        Map<String, PortalValue> current = new HashMap<>();
+        current.put(setting.id(), PortalValue.readFailure("读取失败: settings get global captive_portal_http_url exit=1"));
+
+        int saved = PortalSnapshots.backupMissingOriginals(prefs, singleton(setting), current);
+
+        assertEquals(0, saved);
+        assertFalse(PortalSnapshots.hasOriginal(prefs, setting));
+    }
+
+    @Test
+    public void legacyFailedOriginalIsIgnoredAndReplacedByReadableValue() {
+        InMemorySharedPreferences prefs = new InMemorySharedPreferences();
+        PortalSetting setting = new PortalSetting(
+                PortalSetting.Store.GLOBAL,
+                PortalRules.CAPTIVE_PORTAL_HTTP_URL,
+                "",
+                21);
+        prefs.edit()
+                .putBoolean("snapshot.original.exists." + setting.id(), false)
+                .putString("snapshot.original.value." + setting.id(), "")
+                .putString("snapshot.original.source." + setting.id(), "读取失败: old failure")
+                .apply();
+        Map<String, PortalValue> current = new HashMap<>();
+        current.put(setting.id(), PortalValue.of("http://example.test/generate_204", "test"));
+
+        int saved = PortalSnapshots.backupMissingOriginals(prefs, singleton(setting), current);
+
+        assertEquals(1, saved);
+        assertTrue(PortalSnapshots.hasOriginal(prefs, setting));
+        assertEquals("http://example.test/generate_204", PortalSnapshots.original(prefs, setting).value);
+    }
+
     private static void assertHas(List<PortalSetting> settings, PortalSetting.Store store, String key, String value) {
         for (PortalSetting setting : settings) {
             if (setting.store == store && setting.key.equals(key) && setting.value.equals(value)) {
@@ -99,5 +139,11 @@ public final class PortalRulesTest {
             }
         }
         throw new AssertionError("Missing " + store + " " + key + "=" + value);
+    }
+
+    private static List<PortalSetting> singleton(PortalSetting setting) {
+        List<PortalSetting> settings = new ArrayList<>();
+        settings.add(setting);
+        return settings;
     }
 }

@@ -24,7 +24,7 @@ final class PortalShell {
             if (result.ok()) {
                 values.put(setting.id(), PortalValue.fromSettingsOutput(result.output, "Shizuku UserService: " + command));
             } else {
-                values.put(setting.id(), PortalValue.missing("读取失败: " + command + " exit=" + result.exitCode));
+                values.put(setting.id(), PortalValue.readFailure("读取失败: " + command + " exit=" + result.exitCode));
             }
         }
         return values;

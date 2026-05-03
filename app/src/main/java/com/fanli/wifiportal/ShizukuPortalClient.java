@@ -26,6 +26,7 @@ final class ShizukuPortalClient {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<ServiceCallback> pendingCallbacks = new ArrayList<>();
     private IPortalShell shell;
+    private Shizuku.UserServiceArgs serviceArgs;
     private boolean binding;
 
     private final ServiceConnection connection = new ServiceConnection() {
@@ -75,19 +76,21 @@ final class ShizukuPortalClient {
     String serverVersionName() {
         try {
             int version = Shizuku.getVersion();
-            int patch = Shizuku.getServerPatchVersion();
-            return patch > 0 ? "v" + version + "." + patch : "v" + version;
+            return "v" + version;
         } catch (Throwable ignored) {
             return "";
         }
     }
 
-    void requestPermission() {
+    boolean requestPermission() {
         try {
-            if (!Shizuku.isPreV11() && !Shizuku.shouldShowRequestPermissionRationale()) {
-                Shizuku.requestPermission(REQUEST_CODE);
+            if (Shizuku.isPreV11()) {
+                return false;
             }
+            Shizuku.requestPermission(REQUEST_CODE);
+            return true;
         } catch (Throwable ignored) {
+            return false;
         }
     }
 
@@ -97,8 +100,10 @@ final class ShizukuPortalClient {
             return;
         }
         if (!hasPermission()) {
-            requestPermission();
-            callback.onError("缺少 Shizuku 授权，已请求弹窗授权。");
+            boolean requested = requestPermission();
+            callback.onError(requested
+                    ? "缺少 Shizuku 授权，已请求授权。"
+                    : "缺少 Shizuku 授权，请在 Shizuku 中手动授权。");
             return;
         }
         if (shell != null) {
@@ -111,14 +116,7 @@ final class ShizukuPortalClient {
         }
         binding = true;
         try {
-            ComponentName componentName = new ComponentName(context, PortalUserService.class);
-            Shizuku.UserServiceArgs args = new Shizuku.UserServiceArgs(componentName)
-                    .daemon(false)
-                    .processNameSuffix("portal")
-                    .debuggable(BuildConfig.DEBUG)
-                    .version(BuildConfig.VERSION_CODE)
-                    .tag("wifiportal-shell");
-            Shizuku.bindUserService(args, connection);
+            Shizuku.bindUserService(userServiceArgs(), connection);
         } catch (Throwable e) {
             binding = false;
             flushError("无法绑定 Shizuku UserService: " + e.getMessage());
@@ -128,12 +126,33 @@ final class ShizukuPortalClient {
     void destroy() {
         IPortalShell current = shell;
         shell = null;
+        binding = false;
+        pendingCallbacks.clear();
         if (current != null) {
             try {
                 current.destroy();
             } catch (Throwable ignored) {
             }
         }
+        if (serviceArgs != null) {
+            try {
+                Shizuku.unbindUserService(serviceArgs, connection, true);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private Shizuku.UserServiceArgs userServiceArgs() {
+        if (serviceArgs == null) {
+            ComponentName componentName = new ComponentName(context, PortalUserService.class);
+            serviceArgs = new Shizuku.UserServiceArgs(componentName)
+                    .daemon(false)
+                    .processNameSuffix("portal")
+                    .debuggable(BuildConfig.DEBUG)
+                    .version(BuildConfig.VERSION_CODE)
+                    .tag("wifiportal-shell");
+        }
+        return serviceArgs;
     }
 
     private void flushReady() {
