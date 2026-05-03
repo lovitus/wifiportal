@@ -1,0 +1,5 @@
+-keep class com.fanli.wifiportal.PortalUserService { *; }
+-keep class com.fanli.wifiportal.IPortalShell { *; }
+-keep class com.fanli.wifiportal.IPortalShell$Stub { *; }
+-keep class com.fanli.wifiportal.IPortalShell$Stub$Proxy { *; }
+-dontwarn rikka.shizuku.**
