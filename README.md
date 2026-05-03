@@ -63,3 +63,4 @@ Required secrets:
 - `ANDROID_KEY_PASSWORD`
 
 The workflow builds debug APKs for every push/PR and signed release APKs when the signing secrets are present.
+It does not upload Actions artifacts. For `v*` tags it uploads the signed APK directly to the matching GitHub Release.

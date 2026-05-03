@@ -3,8 +3,12 @@ name: Android
 on:
   push:
     branches: ["**"]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   test-and-build:
@@ -48,7 +52,15 @@ jobs:
             -PWIFIPORTAL_KEY_ALIAS="$ANDROID_KEY_ALIAS" \
             -PWIFIPORTAL_KEY_PASSWORD="$ANDROID_KEY_PASSWORD"
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wifiportal-apks
-          path: app/build/outputs/apk/**/*.apk
+      - name: Upload signed APK to GitHub Release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && env.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          apk_name="wifiportal-${GITHUB_REF_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$apk_name"
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" \
+              --title "WiFi Portal ${GITHUB_REF_NAME#v}" \
+              --notes "Automated signed release for ${GITHUB_SHA}."
+          gh release upload "$GITHUB_REF_NAME" "$apk_name" --clobber
