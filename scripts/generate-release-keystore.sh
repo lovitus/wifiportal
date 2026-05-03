@@ -7,7 +7,7 @@ ALIAS="${2:-wifiportal}"
 mkdir -p "$(dirname "$OUT")"
 
 STORE_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
-KEY_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
+KEY_PASSWORD="$STORE_PASSWORD"
 
 keytool -genkeypair \
   -v \
