@@ -9,6 +9,11 @@ on:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,19 +34,19 @@ jobs:
         run: ./gradlew assembleDebug
 
       - name: Decode release keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         run: |
           mkdir -p "$RUNNER_TEMP/signing"
-          printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/signing/release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/signing/release.jks"
 
       - name: Build signed release APK
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         run: |
           ./gradlew assembleRelease \
             -PWIFIPORTAL_STORE_FILE="$RUNNER_TEMP/signing/release.jks" \
-            -PWIFIPORTAL_STORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            -PWIFIPORTAL_KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}" \
-            -PWIFIPORTAL_KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+            -PWIFIPORTAL_STORE_PASSWORD="$ANDROID_KEYSTORE_PASSWORD" \
+            -PWIFIPORTAL_KEY_ALIAS="$ANDROID_KEY_ALIAS" \
+            -PWIFIPORTAL_KEY_PASSWORD="$ANDROID_KEY_PASSWORD"
 
       - uses: actions/upload-artifact@v4
         with:
